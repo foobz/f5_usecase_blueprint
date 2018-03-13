@@ -237,12 +237,12 @@ inputs:
   fw_vnf_hostname:
     description: BIG-IP VFW HOSTNAME
     type: string
-    default: vfw.aptira.lab
+    default: vfw.foobz.lab
 
   lb_vnf_hostname:
     description: BIG-IP VFW HOSTNAME
     type: string
-    default: vlb.aptira.lab
+    default: vlb.foobz.lab
 
   bigiq_ip:
     description: BIGIQ License Manager IP address
