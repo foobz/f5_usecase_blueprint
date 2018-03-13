@@ -1,0 +1,11 @@
+#!/bin/sh
+unset -v line1 line2
+{ IFS= read -r line1 && IFS= read -r line2;} < name
+
+if [ $line1 = "install" ]; then
+ /usr/bin/cfy deployment create $line2 -b f5-usecase-blueprint
+ /usr/bin/cfy executions start -d $line2 install 
+elif [ $line1 = "uninstall" ]; then
+ /usr/bin/cfy executions start  -d $line2 uninstall 
+ /usr/bin/cfy deployments delete $line2
+fi

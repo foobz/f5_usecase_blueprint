@@ -1,0 +1,19 @@
+sleep 30
+mkdir /config/cloud
+curl -ko /config/cloud/f5-cloud-libs.tar.gz --silent --fail --retry 20 -L https://10.0.125.9/f5-cloud-libs.tar.gz
+tar xzf /config/cloud/f5-cloud-libs.tar.gz -C /config/cloud/
+sleep 5
+
+curl -ko /config/bigiplicmgr.py --silent --fail --retry 20 https://10.0.125.9/bigiplicmgr.py
+chmod u+x /config/bigiplicmgr.py
+
+f5-rest-node /config/cloud/f5-cloud-libs/scripts/onboard.js -o /var/log/onboard.log --no-reboot --host localhost --user admin --password admin --license-pool --big-iq-host {{BIGIQ_LM}} --big-iq-user admin --big-iq-password {{BIGIQ_ADM_PWD}} --license-pool-name {{REG_KEY_POOL}} --set-root-password old:default,new:{{ROOT_NEW_PWD}} --update-user user:admin,password:{{ADMIN_NEW_PWD}} --global-setting mgmt-dhcp:disabled --hostname {{HOSTNAME}} --ntp {{NTP_SERVER}} --tz {{TIMEZONE}} --dns {{DNS}}
+
+f5-rest-node /config/cloud/f5-cloud-libs/scripts/network.js -o /var/log/onboard-network.log --host localhost --user admin --password {{ADMIN_NEW_PWD}} --vlan name:vlan_inside,nic:1.1 --self-ip name:self_inside,address:{{IP_INSIDE}}/{{INSIDE_CIDR}},vlan:vlan_inside --vlan name:vlan_outside,nic:1.2 --self-ip name:self_outside,address:{{IP_OUTSIDE}}/{{OUTSIDE_CIDR}},vlan:vlan_outside
+
+tmsh create ltm pool ipv4_pool {monitor gateway_icmp }
+tmsh create ltm persistence source-addr SRCv4_CARP_Persist { app-service none defaults-from source_addr map-proxies enabled hash-algorithm carp mask 255.255.255.255 timeout indefinite }
+tmsh create ltm virtual IPv4_Out_fwd { destination /Common/0.0.0.0:0 mask any persist replace-all-with { /Common/SRCv4_CARP_Persist { default yes }} pool ipv4_pool profiles replace-all-with { fastL4 {}} source 0.0.0.0/0 translate-address disabled translate-port disabled vlans replace-all-with { vlan_inside} vlans-enabled }
+tmsh create ltm virtual Inbound_ip4fwd { destination /Common/0.0.0.0:0 ip-forward mask any profiles replace-all-with { fastL4 {}} source 0.0.0.0/0 translate-address disabled translate-port disabled vlans replace-all-with { vlan_inside} vlans-enabled }
+
+tmsh modify ltm pool ipv4_pool { members add { {{VFW_IP}}:any { state user-up }} monitor gateway_icmp }

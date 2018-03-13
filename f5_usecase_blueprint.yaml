@@ -1,0 +1,735 @@
+tosca_definitions_version: cloudify_dsl_1_3
+
+imports:
+   - http://www.getcloudify.org/spec/cloudify/4.2/types.yaml
+   - http://www.getcloudify.org/spec/openstack-plugin/2.6.0/plugin.yaml
+   - http://www.getcloudify.org/spec/utilities-plugin/1.4.5/plugin.yaml
+
+inputs:
+
+  keystone_username:
+    description: OpenStack identity service username
+    type: string
+    default: { get_secret: keystone_username }
+
+  keystone_password:
+    description: OpenStack identity service password
+    type: string
+    default: { get_secret: keystone_password }
+
+  keystone_tenant_name:
+    description: OpenStack tenant name
+    type: string
+    default: { get_secret: keystone_tenant_name }
+
+  keystone_url:
+    description: Keystone authentication URL
+    type: string
+    default: { get_secret: keystone_url }
+
+  region:
+    description: OpenStack region
+    type: string
+    default: { get_secret: region }
+
+  vnf_flavor:
+    description: Flavor to boot VNFs
+    type: string
+    default: 'm1.f5.medium'
+
+  zone:
+    description: OpenStack availability zone to boot VNFs
+    type: string
+    default: 'nova'
+
+  bigip_image_url:
+    description: URL to download BIG-IP image
+    type: string
+    default: ''
+
+  bigip_image_use_existing:
+    description: Do you want to use existing BIG-IP image to boot VNFs
+    type: boolean
+    default: true
+
+  bigip_image_name:
+    description: BIG-IP image name to boot VNFs
+    type: string
+    default: 'BIGIP-13.1.0.2.0.0.6_60G'
+
+# Management Network definition
+  management_network_name:
+    description: Management network name for VNFs.
+    type: string
+    default: 'mgmt_net'
+
+  management_network_port_name:
+    description: Management network port name for VNFs
+    type: string
+    default: 'mgmt_net_port'
+
+  management_network_use_existing:
+    description: Do you want to use existing management network for VNFs?
+    type: boolean
+    default: true
+
+  management_subnet_name:
+    description: Management subnet name for VNFs
+    type: string
+    default: 'mgmt_subnet'
+
+  management_subnet_use_existing:
+    description: Do you want to use existing Management Subnet?
+    type: boolean
+    default: true
+
+  management_subnet_ip_version:
+    description: VNF's maangement subnet IP version, 4 OR 6.
+    type: integer
+    default: 4
+
+  management_subnet_cidr:
+    description: VNF's management subnet CIDR to use
+    type: string
+    default: 24
+
+# Internal/ingress Network definition
+  ingress_network_name:
+    description: Internal/ingress network name for VNFs.
+    type: string
+    default: 'inside_net'
+
+  ingress_network_port_name:
+    description: Internal/ingress network port name for VNFs
+    type: string
+    default: 'inside_network_port'
+
+  ingress_network_use_existing:
+    description: Do you want to use existing firewall internal/ingress network for VNFs?
+    type: boolean
+    default: true
+
+  ingress_subnet_name:
+    description: VNF's firewall internal/ingress network subnet name
+    type: string
+    default: 'inside_subnet'
+
+  ingress_subnet_use_existing:
+    description: Do you want to use existing internal/ingress subnet?
+    type: boolean
+    default: true
+
+  ingress_subnet_ip_version:
+    description: VNF's internal/ingress subnet IP version, 4 or 6.
+    type: integer
+    default: 4
+
+  ingress_subnet_cidr:
+    description: VPN's internal/ingress subnet CIDR to use
+    type: string
+    default: 24
+
+# Outside/egress Network definition
+  egress_network_name:
+    description: Outside/egress network name for VNFs.
+    type: string
+    default: 'external_net'
+
+  egress_network_port_name:
+    description: Outsie/egress network port name for VNFs
+    type: string
+    default: 'external_net_port'
+
+  egress_network_use_existing:
+    description: Do you want to use existing firewall outside/egress network for VNFs?
+    type: boolean
+    default: true
+
+  egress_subnet_name:
+    description: VNF's firewall outside/egress network subnet name
+    type: string
+    default: 'external_subnet'
+
+  egress_subnet_use_existing:
+    description: Do you want to use existing outside/egress subnet?
+    type: boolean
+    default: true
+
+  egress_subnet_ip_version:
+    description: VNF's outside/egress subnet IP version, 4 or 6.
+    type: integer
+    default: 4
+
+  egress_subnet_cidr:
+    description: VPN's outside/egress subnet CIDR to use
+    type: string
+    default: 24
+
+
+# Transport Network definition (between vLBS and vFW)
+  transport_network_name:
+    description: Transport network name for VNFs.
+    type: string
+    default: 'transport_net'
+
+  transport_network_port_name:
+    description: Transport network port name for VNFs
+    type: string
+    default: 'transport_net_port'
+
+  transport_network_use_existing:
+    description: Do you want to use existing firewall transport network for VNFs?
+    type: boolean
+    default: true
+
+  transport_subnet_name:
+    description: VNF's firewall transport network subnet name
+    type: string
+    default: 'transport_net_subnet'
+
+  transport_subnet_use_existing:
+    description: Do you want to use existing transport subnet?
+    type: boolean
+    default: true
+
+  transport_subnet_ip_version:
+    description: VNF's transport subnet IP version, 4 or 6.
+    type: integer
+    default: 4
+
+  transport_subnet_cidr:
+    description: VPN's transport subnet CIDR to use
+    type: string
+    default: 24
+
+  initial_fw_vnf_count:
+    description: Initial count of firewall instance.
+    type: integer
+    default: 1
+
+  initial_lb_vnf_count:
+    description: Initial count of firewall instance.
+    type: integer
+    default: 1
+
+  vnf_secgroup_use_existing:
+    description: Do you want to use existing security group for firewall VNFs?
+    type: boolean
+    default: true
+
+  vnf_secgroup_name:
+    description: Security group name for firewall VNFs.
+    type: string
+    default: 'vnf_security_group'
+
+  vnf_secgroup_rules:
+    description: Security group rules for firewall VNFs.
+    default:
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: "TCP"
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: "UDP"
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: "ICMP"
+        port_range_min: null
+        port_range_max: null
+
+  fw_vnf_hostname:
+    description: BIG-IP VFW HOSTNAME
+    type: string
+    default: vfw.aptira.lab
+
+  lb_vnf_hostname:
+    description: BIG-IP VFW HOSTNAME
+    type: string
+    default: vlb.aptira.lab
+
+  bigiq_ip:
+    description: BIGIQ License Manager IP address
+    type: string
+    default: '10.0.125.8'
+
+  bigiq_adm_pwd:
+    description: BIGIQ License Manager admin password
+    type: string
+    default: { get_secret: bigiq_adm_pwd }
+
+  vnf_new_adm_pwd:
+    description: BIG-IP VNF - vFW/vLB new password (changed from default)
+    type: string
+    default: { get_secret: vnf_new_adm_pwd }
+
+  vnf_new_root_pwd:
+    description: BIG-IP VNF - vFW/vLB new root password (changed from default)
+    type: string
+    default: { get_secret: vnf_new_root_pwd }
+
+  license_key:
+    description: BIG-IP VFW license key string (if license via Internet)
+    type: string
+    default: ''
+
+  fw_vnf_default_gw_ip:
+    description: BIG-IP VFW default gateway IP address
+    type: string
+    default: ''
+
+  lb_vnf_default_gw_ip:
+    description: BIG-IP VLB default gateway IP address
+    type: string
+    default: ''
+
+  fw_reg_key_pool:
+    description: BIG-IQ Registration Key Pool
+    type: string
+    default: 'RegKeyPool'
+
+  lb_reg_key_pool:
+    description: BIG-IQ Registration Key Pool
+    type: string
+    default: 'LBSKeyPool'
+
+
+dsl_definitions:
+  openstack_config: &openstack_config
+    username: { get_input: keystone_username }
+    password: { get_input: keystone_password }
+    tenant_name: { get_input: keystone_tenant_name }
+    auth_url: { get_input: keystone_url }
+    region: { get_input: region }
+
+node_templates:
+
+  vfw_baseline_config:
+    type: cloudify.terminal.raw
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            terminal_auth: &vfw_terminal_auth
+              user: root
+              password: default
+              ip: { get_attribute: [vFW, networks, { get_input: management_network_name}, 0] }
+              key_content: ''
+              port: 22
+              promt_check:
+                - '#'
+                - '$'
+              errors:
+                - "Command fail."
+            calls:
+              - action: exit
+        start:
+          inputs:
+            terminal_auth: *vfw_terminal_auth
+            calls:
+              - template: templates/f5-cloudlib-vfw.txt
+                params:
+                  HOSTNAME: { get_input: fw_vnf_hostname }
+                  GATEWAY_IP: { get_input: fw_vnf_default_gw_ip }
+                  INSIDE_CIDR: 24
+                  OUTSIDE_CIDR: 24
+                  BIGIQ_LM: {get_input: bigiq_ip }
+                  REG_KEY_POOL: {get_input: fw_reg_key_pool}
+                  BIGIQ_ADM_PWD: { get_input: bigiq_adm_pwd }
+                  ADMIN_NEW_PWD: { get_input: vnf_new_adm_pwd }
+                  ROOT_NEW_PWD: { get_input: vnf_new_root_pwd }
+                  NTP_SERVER: pool.ntp.org
+                  TIMEZONE: Australia/Melbourne
+                  DNS: 8.8.8.8
+                  F5_MODULE: afm:nominal
+                  IP_MGMT: { get_attribute: [vFW, networks, { get_input: management_network_name }, 0] }
+                  IP_INSIDE: { get_attribute: [vFW, networks, { get_input: transport_network_name }, 0] }
+                  IP_OUTSIDE: { get_attribute: [vFW, networks, { get_input: egress_network_name }, 0] }
+                  LICENSE_KEY: {get_input: license_key }
+        stop:
+          inputs:
+            terminal_auth:
+              user: root
+              password: { get_input: vnf_new_root_pwd }
+              ip: { get_attribute: [vFW, networks, { get_input: management_network_name}, 0] }
+              key_content: ''
+              port: 22
+              promt_check:
+                - '#'
+                - '$'
+              errors:
+                - "Command fail."
+            calls:
+              - action: exit
+            calls:
+            - template: templates/f5-bigiq-revoke.txt
+              params:
+                BIGIQ_LM: {get_input: bigiq_ip }
+                BIGIQ_ADM_PWD: { get_input: bigiq_adm_pwd }
+                IP_MGMT: { get_attribute: [vFW, networks, { get_input: management_network_name }, 0] }
+                ADMIN_NEW_PWD: { get_input: vnf_new_adm_pwd }
+                REG_KEY_POOL: {get_input: fw_reg_key_pool}
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: vFW
+      - type: cloudify.relationships.depends_on
+        target: fw_vnf_management_network_port
+
+  vlb_baseline_config:
+    type: cloudify.terminal.raw
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            terminal_auth: &vlb_terminal_auth
+              user: root
+              password: default
+              ip: { get_attribute: [vLB, networks, { get_input: management_network_name}, 0] }
+              key_content: ''
+              port: 22
+              promt_check:
+                - '#'
+                - '$'
+              errors:
+                - "Command fail."
+            calls:
+              - action: exit
+        start:
+          inputs:
+            terminal_auth: *vlb_terminal_auth
+            calls:
+              - template: templates/f5-cloudlib-vlb.txt
+                params:
+                  HOSTNAME: { get_input: lb_vnf_hostname }
+                  GATEWAY_IP: { get_input: lb_vnf_default_gw_ip }
+                  INSIDE_CIDR: 24
+                  OUTSIDE_CIDR: 24
+                  BIGIQ_LM: {get_input: bigiq_ip }
+                  REG_KEY_POOL: {get_input: lb_reg_key_pool}
+                  BIGIQ_ADM_PWD: { get_input: bigiq_adm_pwd }
+                  ADMIN_NEW_PWD: { get_input: vnf_new_adm_pwd }
+                  ROOT_NEW_PWD: { get_input: vnf_new_root_pwd }
+                  NTP_SERVER: pool.ntp.org
+                  TIMEZONE: Australia/Melbourne
+                  DNS: 8.8.8.8
+                  F5_MODULE: afm:nominal
+                  IP_MGMT: { get_attribute: [vLB, networks, { get_input: management_network_name }, 0] }
+                  IP_INSIDE: { get_attribute: [vLB, networks, { get_input: ingress_network_name }, 0] }
+                  IP_OUTSIDE: { get_attribute: [vLB, networks, { get_input: transport_network_name }, 0] }
+                  LICENSE_KEY: {get_input: license_key }
+                  VFW_IP: { get_attribute: [vFW, networks, { get_input: transport_network_name }, 0] }
+        stop:
+          inputs:
+            terminal_auth:
+              user: root
+              password: { get_input: vnf_new_root_pwd }
+              ip: { get_attribute: [vLB, networks, { get_input: management_network_name}, 0] }
+              key_content: ''
+              port: 22
+              promt_check:
+                - '#'
+                - '$'
+              errors:
+                - "Command fail."
+            calls:
+              - action: exit
+            calls:
+            - template: templates/f5-bigiq-revoke.txt
+              params:
+                BIGIQ_LM: {get_input: bigiq_ip }
+                BIGIQ_ADM_PWD: { get_input: bigiq_adm_pwd }
+                IP_MGMT: { get_attribute: [vLB, networks, { get_input: management_network_name }, 0] }
+                ADMIN_NEW_PWD: { get_input: vnf_new_adm_pwd }
+                REG_KEY_POOL: {get_input: lb_reg_key_pool}
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: vLB
+      - type: cloudify.relationships.depends_on
+        target: lb_vnf_management_network_port
+
+  vFW:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      openstack_config: *openstack_config
+      agent_config:
+        install_method: none
+      resource_id: vFW
+      image: {  get_attribute: [ bigip_image, external_id ]  }
+      flavor: { get_input: vnf_flavor }
+    relationships:
+      - target: fw_vnf_management_network_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: fw_vnf_transport_network_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: fw_vnf_egress_network_port
+        type: cloudify.openstack.server_connected_to_port
+
+  vLB:
+    type: cloudify.openstack.nodes.Server
+    properties:
+      openstack_config: *openstack_config
+      agent_config:
+        install_method: none
+      resource_id: vLB
+      image: {  get_attribute: [ bigip_image, external_id ]  }
+      flavor: { get_input: vnf_flavor }
+    relationships:
+      - target: lb_vnf_management_network_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: lb_vnf_ingress_network_port
+        type: cloudify.openstack.server_connected_to_port
+      - target: lb_vnf_transport_network_port
+        type: cloudify.openstack.server_connected_to_port
+
+  bigip_image:
+    type: cloudify.openstack.nodes.Image
+    properties:
+      image:
+        container_format: "bare"
+        disk_format: "qcow2"
+      openstack_config: *openstack_config
+      image_url: { get_input : bigip_image_url }
+      use_external_resource:  true
+      resource_id: { get_input: bigip_image_name }
+
+  fw_vnf_management_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: management_network_port_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: management_network
+      - type: cloudify.relationships.depends_on
+        target: management_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  lb_vnf_management_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: management_network_port_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: management_network
+      - type: cloudify.relationships.depends_on
+        target: management_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  management_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: management_subnet_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: management_subnet_name }
+      subnet:
+        ip_version: { get_input: management_subnet_ip_version }
+        cidr: { get_input: management_subnet_cidr }
+        dns_nameservers: [8.8.8.8]
+    relationships:
+      - target: management_network
+        type: cloudify.relationships.contained_in
+
+  management_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: management_network_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: management_network_name }
+
+  fw_vnf_egress_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: egress_network_port_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: egress_network
+      - type: cloudify.relationships.depends_on
+        target: egress_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  egress_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: egress_subnet_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: egress_subnet_name }
+      subnet:
+        ip_version: { get_input: egress_subnet_ip_version }
+        cidr: { get_input: egress_subnet_cidr }
+        dns_nameservers: [8.8.8.8]
+    relationships:
+      - target: egress_network
+        type: cloudify.relationships.contained_in
+
+  egress_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: egress_network_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: egress_network_name }
+
+  lb_vnf_transport_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: transport_network_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: transport_network
+      - type: cloudify.relationships.depends_on
+        target: transport_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  fw_vnf_transport_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: transport_network_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: transport_network
+      - type: cloudify.relationships.depends_on
+        target: transport_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  transport_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: transport_subnet_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: transport_subnet_name }
+      subnet:
+        ip_version: { get_input: transport_subnet_ip_version }
+        cidr: { get_input: transport_subnet_cidr }
+        dns_nameservers: [8.8.8.8]
+    relationships:
+      - target: transport_network
+        type: cloudify.relationships.contained_in
+
+  transport_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: transport_network_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: transport_network_name }
+
+  vnf_secgroup:
+    type: cloudify.openstack.nodes.SecurityGroup
+    properties:
+      openstack_config: *openstack_config
+      security_group:
+        name: { get_input: vnf_secgroup_name }
+      rules: { get_input: vnf_secgroup_rules }
+
+  lb_vnf_ingress_network_port:
+    type: cloudify.openstack.nodes.Port
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: false
+      resource_id: { get_input: ingress_network_port_name }
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          inputs:
+            args:
+              allowed_address_pairs: [{"ip_address": "0.0.0.0/0"}]
+    relationships:
+      - type: cloudify.relationships.depends_on
+        target: ingress_network
+      - type: cloudify.relationships.depends_on
+        target: ingress_subnet
+      - type: cloudify.openstack.port_connected_to_security_group
+        target: vnf_secgroup
+
+  ingress_subnet:
+    type: cloudify.openstack.nodes.Subnet
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: ingress_subnet_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: ingress_subnet_name }
+      subnet:
+        ip_version: { get_input: ingress_subnet_ip_version }
+        cidr: { get_input: ingress_subnet_cidr }
+    relationships:
+      - target: ingress_network
+        type: cloudify.relationships.contained_in
+
+  ingress_network:
+    type: cloudify.openstack.nodes.Network
+    properties:
+      openstack_config: *openstack_config
+      use_external_resource: { get_input: ingress_network_use_existing }
+      create_if_missing: true
+      resource_id: { get_input: ingress_network_name }
+
+
+groups:
+  fw_vnf_and_ports:
+    members: [vFW, fw_vnf_management_network_port, lb_vnf_transport_network_port, fw_vnf_egress_network_port]
+
+policies:
+  fw_vnf_scale_policy:
+    type: cloudify.policies.scaling
+    properties:
+      default_instances: { get_input: initial_fw_vnf_count }
+    targets: [fw_vnf_and_ports]
+
+outputs:
+      lb_management_ip: 
+        value: { get_attribute: [vLB, networks, { get_input: management_network_name }, 0] }
+      lb_ingress_ip: 
+        value: { get_attribute: [vLB, networks, { get_input: ingress_network_name }, 0] }
+      lb_transport_ip: 
+        value: { get_attribute: [vLB, networks, { get_input: transport_network_name }, 0] }
+      fw_management_ip: 
+        value: { get_attribute: [vFW, networks, { get_input: management_network_name }, 0] }
+      fw_transport_ip: 
+        value: { get_attribute: [vFW, networks, { get_input: transport_network_name }, 0] }
+      fw_egress_ip: 
+        value: { get_attribute: [vFW, networks, { get_input: egress_network_name }, 0] }
+

@@ -1,0 +1,19 @@
+sleep 30
+mkdir /config/cloud
+curl -ko /config/cloud/f5-cloud-libs.tar.gz --silent --fail --retry 20 -L https://10.0.125.9/f5-cloud-libs.tar.gz
+tar xzf /config/cloud/f5-cloud-libs.tar.gz -C /config/cloud/
+sleep 5
+
+curl -ko /config/bigiplicmgr.py --silent --fail --retry 20 https://10.0.125.9/bigiplicmgr.py
+chmod u+x /config/bigiplicmgr.py
+
+f5-rest-node /config/cloud/f5-cloud-libs/scripts/onboard.js -o /var/log/onboard.log --no-reboot --host localhost --user admin --password admin --license-pool --big-iq-host {{BIGIQ_LM}} --big-iq-user admin --big-iq-password {{BIGIQ_ADM_PWD}} --license-pool-name {{REG_KEY_POOL}} --set-root-password old:default,new:{{ROOT_NEW_PWD}} --update-user user:admin,password:{{ADMIN_NEW_PWD}} --global-setting mgmt-dhcp:disabled --hostname {{HOSTNAME}} --ntp {{NTP_SERVER}} --tz {{TIMEZONE}} --dns {{DNS}} --module {{F5_MODULE}}
+
+f5-rest-node /config/cloud/f5-cloud-libs/scripts/network.js -o /var/log/onboard-network.log --host localhost --user admin --password {{ADMIN_NEW_PWD}} --vlan name:vlan_inside,nic:1.1 --self-ip name:self_inside,address:{{IP_INSIDE}}/{{INSIDE_CIDR}},vlan:vlan_inside --vlan name:vlan_outside,nic:1.2 --self-ip name:self_outside,address:{{IP_OUTSIDE}}/{{OUTSIDE_CIDR}},vlan:vlan_outside --route name:default_gw,gw:{{GATEWAY_IP}},network:0.0.0.0/0
+
+tmsh create ltm virtual ip_forward { destination /Common/0.0.0.0:0 ip-forward mask any profiles replace-all-with { fastL4 {}} security-log-profiles replace-all-with { global-network } source 0.0.0.0/0 source-address-translation { type automap } }
+tmsh create security firewall policy Global_FW_Policy
+tmsh modify security firewall global-rules { enforced-policy Global_FW_Policy }
+tmsh modify ltm virtual ip_forward {fw-enforced-policy Global_FW_Policy }
+tmsh modify sys db tm.fw.globaldefaultrule.log value enable
+tmsh modify sys db tm.fw.defaultaction value drop
